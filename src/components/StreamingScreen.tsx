@@ -215,24 +215,24 @@ export const StreamingScreen = ({
       </View>
 
       <View style={styles.footer}>
-        <View>
-          {/* <Text style={styles.statusLabel}>Connection</Text>
-          <Text style={styles.statusValue}>{connectionLabel}</Text> */}
-          {/* {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null} */}
+        <View style={styles.statusSection}>
+          <View style={styles.statusRow}>
+            <Text style={styles.statusLabel}>Connection:</Text>
+            <Text style={styles.statusValue}>{connectionLabel}</Text>
+          </View>
+          {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
           {isFinishing ? <Text style={styles.info}>טוען נתוני דגימה מהשרת...</Text> : null}
         </View>
         <View style={styles.actions}>
           {!isStreaming && (
-            <PrimaryButton label="Start streaming" onPress={beginStreaming} disabled={!cameraReady || !permissionGranted} />
+            <PrimaryButton label="התחל הקלטה" onPress={beginStreaming} disabled={!cameraReady || !permissionGranted} />
           )}
-          <View style={styles.finishButtonContainer}>
-            <PrimaryButton 
-              label={isFinishing ? "מסיים הקלטה..." : "סיום הקלטה"} 
-              onPress={finish} 
-              disabled={isFinishing }
-              style={styles.finishButton}
-            />
-          </View>
+          <PrimaryButton 
+            label={isFinishing ? "מסיים הקלטה..." : "סיום הקלטה"} 
+            onPress={finish} 
+            disabled={isFinishing }
+            style={styles.finishButton}
+          />
           {isStreaming && !isFinishing && (
             <SecondaryButton label="Pause stream" onPress={stopStreaming} />
           )}
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   cameraCard: {
-    flex: 1,
+    height: 500,
     backgroundColor: '#0f172a',
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -299,27 +299,34 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   footer: {
+    flexDirection: 'column',
+    gap: spacing.sm,
+  },
+  statusSection: {
+    gap: spacing.xs,
+  },
+  statusRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: spacing.md,
+    gap: spacing.xs,
+    alignItems: 'center',
   },
   statusLabel: {
     color: colors.muted,
     fontWeight: '600',
+    fontSize: 13,
   },
   statusValue: {
     color: colors.text,
     fontWeight: '700',
-    marginTop: 4,
+    fontSize: 13,
   },
   error: {
     color: colors.danger,
-    marginTop: 4,
+    fontSize: 12,
   },
   info: {
     color: colors.primary,
-    marginTop: 4,
+    fontSize: 12,
     fontWeight: '600',
   },
   actions: {
@@ -327,12 +334,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     flexWrap: 'wrap',
   },
-  finishButtonContainer: {
-    minWidth: 140,
-  },
   finishButton: {
     backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
   },
   permissionBlock: {
     flex: 1,
