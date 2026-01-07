@@ -1,0 +1,31 @@
+export type OperationType = 'takeoff' | 'landing';
+
+export type OperationPhase = 'form' | 'pending' | 'approved' | 'streaming' | 'summary';
+
+export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'closed';
+
+export interface FlightRequest {
+  lat: number;
+  lon: number;
+  widthCm: number;
+  lengthCm: number;
+  operationType: OperationType;
+  locationLabel?: string;
+  createdAt: number;
+}
+
+export interface MissionSummary {
+  operationType: OperationType;
+  startTime: number;
+  endTime: number;
+  location: {
+    lat: number;
+    lon: number;
+    label?: string;
+  };
+  droneSizeCm: {
+    width: number;
+    length: number;
+  };
+}
+
