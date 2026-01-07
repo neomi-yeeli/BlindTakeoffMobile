@@ -14,6 +14,13 @@ export interface FlightRequest {
   createdAt: number;
 }
 
+export interface LocationSample {
+  timestamp: number;
+  lat: number;
+  lon: number;
+  altitude: number;
+}
+
 export interface MissionSummary {
   operationType: OperationType;
   startTime: number;
@@ -27,5 +34,6 @@ export interface MissionSummary {
     width: number;
     length: number;
   };
+  samples: LocationSample[];
 }
 

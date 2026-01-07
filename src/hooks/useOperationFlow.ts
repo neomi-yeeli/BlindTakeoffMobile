@@ -1,8 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
-import { FlightRequest, MissionSummary, OperationPhase } from '../types';
+import { FlightRequest, LocationSample, MissionSummary, OperationPhase } from '../types';
 
 const DEFAULT_APPROVAL_MS = 2200;
+
+// Mock function to simulate fetching samples from server
+// TODO: Replace with actual API call when backend is ready
+const fetchSamplesFromServer = async (): Promise<LocationSample[]> => {
+  // Simulate network delay
+  await new Promise((resolve) => setTimeout(resolve, 800));
+  
+  // Generate mock samples (4-5 samples with realistic data)
+  const now = Date.now();
+  const mockSamples: LocationSample[] = [
+    { timestamp: now - 12000, lat: 32.0853, lon: 34.7818, altitude: 12.5 },
+    { timestamp: now - 9000, lat: 32.0854, lon: 34.7819, altitude: 15.2 },
+    { timestamp: now - 6000, lat: 32.0855, lon: 34.7820, altitude: 18.7 },
+    { timestamp: now - 3000, lat: 32.0856, lon: 34.7821, altitude: 22.3 },
+    { timestamp: now, lat: 32.0857, lon: 34.7822, altitude: 25.0 },
+  ];
+  
+  return mockSamples;
+};
 
 export const useOperationFlow = (autoApproveMs: number = DEFAULT_APPROVAL_MS) => {
   const [phase, setPhase] = useState<OperationPhase>('form');
@@ -36,10 +55,13 @@ export const useOperationFlow = (autoApproveMs: number = DEFAULT_APPROVAL_MS) =>
     setPhase('streaming');
   };
 
-  const finishOperation = (endedAt: number) => {
-    if (!request || !streamingStartRef.current) return;
+  const finishOperation = async (endedAt: number) => {
+    if (!request) return;
     const endTime = endedAt || Date.now();
-    const startTime = streamingStartRef.current;
+    const startTime = streamingStartRef.current || endTime - 5000; // Use current time or 5 seconds ago as fallback
+
+    // Fetch samples from server (currently mock data)
+    const samples = await fetchSamplesFromServer();
 
     setSummary({
       operationType: request.operationType,
@@ -54,6 +76,7 @@ export const useOperationFlow = (autoApproveMs: number = DEFAULT_APPROVAL_MS) =>
         lon: request.lon,
         label: request.locationLabel,
       },
+      samples,
     });
     setPhase('summary');
     streamingStartRef.current = null;

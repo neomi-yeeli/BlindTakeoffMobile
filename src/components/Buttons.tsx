@@ -70,6 +70,7 @@ export const PillToggle = <T extends string>({ options, value, onChange }: PillT
 const styles = StyleSheet.create({
   base: {
     paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderRadius: radius.md,
     alignItems: 'center',
   },
