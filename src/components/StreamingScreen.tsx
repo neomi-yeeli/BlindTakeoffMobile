@@ -31,6 +31,7 @@ export const StreamingScreen = ({
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
   const [isStreaming, setIsStreaming] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isFinishing, setIsFinishing] = useState(false);
 
   const cameraRef = useRef<CameraView | null>(null);
   const streamingClientRef = useRef<StreamingClient | null>(null);
@@ -145,10 +146,15 @@ export const StreamingScreen = ({
     }
   }, [autoStart, beginStreaming, cameraReady, isStreaming, permission?.granted]);
 
-  const finish = useCallback(() => {
+  const finish = useCallback(async () => {
     const endedAt = Date.now();
+    setIsFinishing(true);
     stopStreaming();
-    onFinish(endedAt);
+    try {
+      await onFinish(endedAt);
+    } finally {
+      setIsFinishing(false);
+    }
   }, [onFinish, stopStreaming]);
 
   const connectionLabel = useMemo(() => {
@@ -210,17 +216,26 @@ export const StreamingScreen = ({
 
       <View style={styles.footer}>
         <View>
-          <Text style={styles.statusLabel}>Connection</Text>
-          <Text style={styles.statusValue}>{connectionLabel}</Text>
-          {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+          {/* <Text style={styles.statusLabel}>Connection</Text>
+          <Text style={styles.statusValue}>{connectionLabel}</Text> */}
+          {/* {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null} */}
+          {isFinishing ? <Text style={styles.info}>טוען נתוני דגימה מהשרת...</Text> : null}
         </View>
         <View style={styles.actions}>
-          {!isStreaming ? (
+          {!isStreaming && (
             <PrimaryButton label="Start streaming" onPress={beginStreaming} disabled={!cameraReady || !permissionGranted} />
-          ) : (
-            <PrimaryButton label="Finish operation" onPress={finish} />
           )}
-          {isStreaming ? <SecondaryButton label="Pause stream" onPress={stopStreaming} /> : null}
+          <View style={styles.finishButtonContainer}>
+            <PrimaryButton 
+              label={isFinishing ? "מסיים הקלטה..." : "סיום הקלטה"} 
+              onPress={finish} 
+              disabled={isFinishing }
+              style={styles.finishButton}
+            />
+          </View>
+          {isStreaming && !isFinishing && (
+            <SecondaryButton label="Pause stream" onPress={stopStreaming} />
+          )}
         </View>
       </View>
     </View>
@@ -286,7 +301,7 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.md,
   },
   statusLabel: {
@@ -302,9 +317,22 @@ const styles = StyleSheet.create({
     color: colors.danger,
     marginTop: 4,
   },
+  info: {
+    color: colors.primary,
+    marginTop: 4,
+    fontWeight: '600',
+  },
   actions: {
     flexDirection: 'row',
     gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  finishButtonContainer: {
+    minWidth: 140,
+  },
+  finishButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
   },
   permissionBlock: {
     flex: 1,
