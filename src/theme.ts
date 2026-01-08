@@ -1,14 +1,15 @@
 export const colors = {
   background: '#050915',
   card: '#0B1220',
-  primary: '#22d3ee',
-  primaryAlt: '#0ea5e9',
+  primary: '#3b82f6', // deep but vibrant blue
+  primaryAlt: '#60a5fa',
   success: '#22c55e',
   warning: '#fbbf24',
   danger: '#ef4444',
   text: '#e2e8f0',
   muted: '#94a3b8',
   border: '#1f2937',
+  accent: '#7dd3fc',
 };
 
 export const spacing = {

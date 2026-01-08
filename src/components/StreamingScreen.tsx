@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, AppState, AppStateStatus, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
+import { Audio } from 'expo-av';
 import { colors, radius, spacing } from '../theme';
 import { ConnectionStatus, FlightRequest } from '../types';
 import { PrimaryButton, SecondaryButton } from './Buttons';
 import { StreamingClient } from '../services/StreamingClient';
 import { formatLocation } from '../utils/format';
-import { UI } from '../config';
+import { ALARM_SOUND_URI, UI } from '../config';
 
 type Props = {
   request: FlightRequest;
@@ -31,6 +32,8 @@ export const StreamingScreen = ({
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
   const [isStreaming, setIsStreaming] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isFinishing, setIsFinishing] = useState(false);
+  const [alarmActive, setAlarmActive] = useState(false);
 
   const cameraRef = useRef<CameraView | null>(null);
   const streamingClientRef = useRef<StreamingClient | null>(null);
@@ -39,14 +42,7 @@ export const StreamingScreen = ({
   const sendingRef = useRef(false);
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const livePulse = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    streamingClientRef.current = new StreamingClient(streamUrl, setConnectionStatus);
-    return () => {
-      stopStreaming();
-      streamingClientRef.current?.disconnect();
-    };
-  }, [streamUrl]);
+  const alarmSoundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
@@ -63,6 +59,43 @@ export const StreamingScreen = ({
       ])
     ).start();
   }, [livePulse]);
+
+  const stopAlarm = useCallback(async () => {
+    setAlarmActive(false);
+    try {
+      if (alarmSoundRef.current) {
+        await alarmSoundRef.current.stopAsync();
+        await alarmSoundRef.current.unloadAsync();
+        alarmSoundRef.current = null;
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('stop alarm failed', err);
+    }
+  }, []);
+
+  const startAlarm = useCallback(async () => {
+    if (alarmActive) return;
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: ALARM_SOUND_URI },
+        { shouldPlay: true, isLooping: true, volume: 0.7 }
+      );
+      alarmSoundRef.current = sound;
+      setAlarmActive(true);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('alarm playback failed', err);
+    }
+  }, [alarmActive]);
+
+  useEffect(() => {
+    if (connectionStatus === 'error') {
+      startAlarm();
+    } else {
+      stopAlarm();
+    }
+  }, [connectionStatus, startAlarm, stopAlarm]);
 
   const ensurePermission = useCallback(async () => {
     if (permission?.granted) return true;
@@ -81,7 +114,29 @@ export const StreamingScreen = ({
     stopFrameLoop();
     streamingClientRef.current?.disconnect();
     setIsStreaming(false);
-  }, [stopFrameLoop]);
+    stopAlarm();
+  }, [stopAlarm, stopFrameLoop]);
+
+  useEffect(() => {
+    streamingClientRef.current = new StreamingClient(streamUrl, setConnectionStatus);
+    return () => {
+      stopStreaming();
+      streamingClientRef.current?.disconnect();
+      stopAlarm();
+    };
+  }, [stopAlarm, streamUrl, stopStreaming]);
+
+  useEffect(() => {
+    Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      allowsRecordingIOS: false,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: false,
+    }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.warn('audio mode failed', err);
+    });
+  }, []);
 
   const captureAndSend = useCallback(async () => {
     if (appState.current !== 'active') return;
@@ -152,24 +207,29 @@ export const StreamingScreen = ({
     }
   }, [autoStart, beginStreaming, cameraReady, isStreaming, permission?.granted]);
 
-  const finish = useCallback(() => {
+  const finish = useCallback(async () => {
     const endedAt = Date.now();
+    setIsFinishing(true);
     stopStreaming();
-    onFinish(endedAt);
+    try {
+      await onFinish(endedAt);
+    } finally {
+      setIsFinishing(false);
+    }
   }, [onFinish, stopStreaming]);
 
   const connectionLabel = useMemo(() => {
     switch (connectionStatus) {
       case 'connected':
-        return 'Connected';
+        return 'מחובר';
       case 'connecting':
-        return 'Connecting...';
+        return 'מתחבר...';
       case 'error':
-        return 'Connection error';
+        return 'שגיאה בחיבור';
       case 'closed':
-        return 'Disconnected';
+        return 'מנותק';
       default:
-        return 'Idle';
+        return 'בהמתנה';
     }
   }, [connectionStatus]);
 
@@ -179,14 +239,14 @@ export const StreamingScreen = ({
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <View>
-          <Text style={styles.title}>Live Operation</Text>
-          <Text style={styles.subtitle}>Place the phone on the pad. Streaming will start automatically.</Text>
+          <Text style={styles.title}>מצב מצלמה חי</Text>
+          <Text style={styles.subtitle}>הנח את הטלפון על עמדת ההמראה. ההזרמה החיה תתחיל אוטומטית.</Text>
           <Text style={styles.meta}>
-            Location: {formatLocation(request.lat, request.lon)}
+            מיקום: {formatLocation(request.lat, request.lon)}
             {request.locationLabel ? ` (${request.locationLabel})` : ''}
           </Text>
           <Text style={styles.meta}>
-            Drone size: {request.widthCm}cm × {request.lengthCm}cm · {request.operationType.toUpperCase()}
+            גודל רחפן: {request.widthCm}×{request.lengthCm} ס"מ · {request.operationType === 'takeoff' ? 'המראה' : 'נחיתה'}
           </Text>
         </View>
         <View style={styles.statusPill}>
@@ -198,8 +258,8 @@ export const StreamingScreen = ({
       <View style={styles.cameraCard}>
         {!permissionGranted ? (
           <View style={styles.permissionBlock}>
-            <Text style={styles.permissionText}>Camera permission is required to continue.</Text>
-            <PrimaryButton label="Grant camera access" onPress={beginStreaming} />
+            <Text style={styles.permissionText}>נדרש אישור מצלמה כדי להמשיך.</Text>
+            <PrimaryButton label="אפשר גישה למצלמה" onPress={beginStreaming} />
           </View>
         ) : (
           <CameraView
@@ -217,20 +277,18 @@ export const StreamingScreen = ({
 
       <View style={styles.footer}>
         <View>
-          <Text style={styles.statusLabel}>Connection</Text>
+          <Text style={styles.statusLabel}>חיבור</Text>
           <Text style={styles.statusValue}>{connectionLabel}</Text>
           <Text style={styles.statusUrl} numberOfLines={2}>
             {streamUrl}
           </Text>
           {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+          {alarmActive ? (
+            <SecondaryButton label="כבה אזעקה" onPress={stopAlarm} style={styles.alarmButton} />
+          ) : null}
         </View>
         <View style={styles.actions}>
-          {!isStreaming ? (
-            <PrimaryButton label="Start streaming" onPress={beginStreaming} disabled={!cameraReady || !permissionGranted} />
-          ) : (
-            <PrimaryButton label="Finish operation" onPress={finish} />
-          )}
-          {isStreaming ? <SecondaryButton label="Pause stream" onPress={stopStreaming} /> : null}
+          <PrimaryButton label="סיום הפעולה" onPress={finish} />
         </View>
       </View>
     </View>
@@ -243,7 +301,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   headerRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     gap: spacing.md,
     alignItems: 'center',
@@ -252,14 +310,21 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 22,
     fontWeight: '800',
+    writingDirection: 'rtl',
+    textAlign: 'right',
   },
   subtitle: {
     color: colors.muted,
     marginTop: 4,
+    writingDirection: 'rtl',
+    textAlign: 'right',
+    fontSize: 13,
   },
   meta: {
     color: colors.muted,
     marginTop: 2,
+    writingDirection: 'rtl',
+    textAlign: 'right',
   },
   statusPill: {
     flexDirection: 'row',
@@ -283,7 +348,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   cameraCard: {
-    flex: 1,
+    height: 500,
     backgroundColor: '#0f172a',
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -294,19 +359,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   statusLabel: {
     color: colors.muted,
     fontWeight: '600',
+    writingDirection: 'rtl',
+    textAlign: 'right',
   },
   statusValue: {
     color: colors.text,
     fontWeight: '700',
     marginTop: 4,
+    writingDirection: 'rtl',
+    textAlign: 'right',
   },
   statusUrl: {
     color: colors.muted,
@@ -316,10 +384,18 @@ const styles = StyleSheet.create({
   error: {
     color: colors.danger,
     marginTop: 4,
+    writingDirection: 'rtl',
+    textAlign: 'right',
   },
   actions: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     gap: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alarmButton: {
+    marginTop: spacing.sm,
+    alignSelf: 'flex-start',
   },
   permissionBlock: {
     flex: 1,
@@ -331,6 +407,7 @@ const styles = StyleSheet.create({
   permissionText: {
     color: colors.muted,
     textAlign: 'center',
+    writingDirection: 'rtl',
   },
 });
 
