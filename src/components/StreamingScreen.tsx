@@ -35,6 +35,7 @@ export const StreamingScreen = ({
   const cameraRef = useRef<CameraView | null>(null);
   const streamingClientRef = useRef<StreamingClient | null>(null);
   const frameLoopRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const captureAndSendRef = useRef<(() => Promise<void>) | null>(null);
   const sendingRef = useRef(false);
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const livePulse = useRef(new Animated.Value(0)).current;
@@ -69,11 +70,6 @@ export const StreamingScreen = ({
     return result.granted;
   }, [permission?.granted, requestPermission]);
 
-  const startFrameLoop = useCallback(() => {
-    if (frameLoopRef.current) return;
-    frameLoopRef.current = setInterval(captureAndSend, FRAME_INTERVAL_MS);
-  }, []);
-
   const stopFrameLoop = useCallback(() => {
     if (frameLoopRef.current) {
       clearInterval(frameLoopRef.current);
@@ -97,7 +93,8 @@ export const StreamingScreen = ({
     try {
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
-        quality: 0.3,
+        // Lower quality helps sustain higher FPS over WebSocket
+        quality: 0.2,
         skipProcessing: true,
       });
       if (photo?.base64) {
@@ -118,6 +115,16 @@ export const StreamingScreen = ({
       sendingRef.current = false;
     }
   }, [cameraReady, connectionStatus, request.operationType]);
+
+  // Keep the interval always calling the latest capture function (avoid stale closure).
+  captureAndSendRef.current = captureAndSend;
+
+  const startFrameLoop = useCallback(() => {
+    if (frameLoopRef.current) return;
+    frameLoopRef.current = setInterval(() => {
+      void captureAndSendRef.current?.();
+    }, FRAME_INTERVAL_MS);
+  }, []);
 
   const beginStreaming = useCallback(async () => {
     const hasPermission = await ensurePermission();
@@ -212,6 +219,9 @@ export const StreamingScreen = ({
         <View>
           <Text style={styles.statusLabel}>Connection</Text>
           <Text style={styles.statusValue}>{connectionLabel}</Text>
+          <Text style={styles.statusUrl} numberOfLines={2}>
+            {streamUrl}
+          </Text>
           {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
         </View>
         <View style={styles.actions}>
@@ -297,6 +307,11 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '700',
     marginTop: 4,
+  },
+  statusUrl: {
+    color: colors.muted,
+    marginTop: 4,
+    maxWidth: 280,
   },
   error: {
     color: colors.danger,

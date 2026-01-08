@@ -24,6 +24,8 @@ export class StreamingClient {
 
     await new Promise<void>((resolve, reject) => {
       try {
+        // eslint-disable-next-line no-console
+        console.log('[streaming] connecting', this.url);
         this.socket = new WebSocket(this.url);
         this.setStatus('connecting');
 
@@ -34,11 +36,19 @@ export class StreamingClient {
 
         this.socket.onerror = (event) => {
           this.setStatus('error');
-          reject(new Error(`Streaming socket error: ${JSON.stringify(event)}`));
+          const maybeMessage = (event as unknown as { message?: unknown })?.message;
+          const details = typeof maybeMessage === 'string' ? maybeMessage : JSON.stringify(event);
+          reject(new Error(`Streaming socket error (${this.url}): ${details}`));
         };
 
-        this.socket.onclose = () => {
+        this.socket.onclose = (event) => {
           this.setStatus('closed');
+          // eslint-disable-next-line no-console
+          console.log('[streaming] closed', {
+            url: this.url,
+            code: (event as unknown as { code?: unknown })?.code,
+            reason: (event as unknown as { reason?: unknown })?.reason,
+          });
         };
       } catch (error) {
         this.setStatus('error');
