@@ -5,6 +5,7 @@ import { PrimaryButton, SecondaryButton } from './Buttons';
 import { formatDuration, formatLocation, formatTime } from '../utils/format';
 import { SummaryRow } from './SummaryRow';
 import { SamplesList } from './SamplesList';
+import { LocationSamplesAnalytics } from './LocationSamplesAnalytics';
 
 type Props = {
   summary: MissionSummary;
@@ -37,6 +38,7 @@ export const MissionSummaryCard = ({ summary, onRestart }: Props) => (
         <Text style={styles.sectionCaption}>נתוני טיסה שנאספו</Text>
 
         <SamplesList samples={summary.samples} />
+        <LocationSamplesAnalytics samples={summary.samples} />
       </View>
 
       <View style={styles.actions}>
