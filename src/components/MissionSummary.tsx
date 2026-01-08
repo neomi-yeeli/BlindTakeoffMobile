@@ -3,6 +3,8 @@ import { colors, radius, spacing } from '../theme';
 import { MissionSummary } from '../types';
 import { PrimaryButton, SecondaryButton } from './Buttons';
 import { formatDuration, formatLocation, formatTime } from '../utils/format';
+import { SummaryRow } from './SummaryRow';
+import { SamplesList } from './SamplesList';
 
 type Props = {
   summary: MissionSummary;
@@ -15,62 +17,26 @@ export const MissionSummaryCard = ({ summary, onRestart }: Props) => (
       <Text style={styles.title}>סיכום משימה</Text>
       <Text style={styles.caption}>הפעולה הסתיימה. סקירה וסגירה.</Text>
 
-      <View style={styles.row}>
-        <Text style={styles.label}>סוג פעולה</Text>
-        <Text style={styles.value}>{summary.operationType === 'takeoff' ? 'המראה' : 'נחיתה'}</Text>
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.label}>משך הפעולה</Text>
-        <Text style={styles.value}>{formatDuration(summary.endTime - summary.startTime)}</Text>
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.label}>שעת התחלה</Text>
-        <Text style={styles.value}>{formatTime(summary.startTime)}</Text>
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.label}>שעת סיום</Text>
-        <Text style={styles.value}>{formatTime(summary.endTime)}</Text>
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.label}>מיקום</Text>
-        <Text style={styles.value}>
-          {formatLocation(summary.location.lat, summary.location.lon)}
-          {summary.location.label ? ` (${summary.location.label})` : ''}
-        </Text>
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.label}>גודל רחפן</Text>
-        <Text style={styles.value}>
-          {summary.droneSizeCm.width}×{summary.droneSizeCm.length} ס"מ
-        </Text>
-      </View>
+      <SummaryRow label="סוג פעולה" value={summary.operationType === 'takeoff' ? 'המראה' : 'נחיתה'} />
+      <SummaryRow label="משך הפעולה" value={formatDuration(summary.endTime - summary.startTime)} />
+      <SummaryRow label="שעת התחלה" value={formatTime(summary.startTime)} />
+      <SummaryRow label="שעת סיום" value={formatTime(summary.endTime)} />
+      <SummaryRow
+        label="מיקום"
+        value={`${formatLocation(summary.location.lat, summary.location.lon)}${
+          summary.location.label ? ` (${summary.location.label})` : ''
+        }`}
+      />
+      <SummaryRow
+        label="גודל רחפן"
+        value={`${summary.droneSizeCm.width}×${summary.droneSizeCm.length} ס\"מ`}
+      />
 
       <View style={styles.samplesSection}>
         <Text style={styles.sectionTitle}>דגימות מיקום/גובה ({summary.samples.length})</Text>
         <Text style={styles.sectionCaption}>נתוני טיסה שנאספו</Text>
 
-        {summary.samples.length === 0 ? (
-          <Text style={styles.noSamples}>אין דגימות זמינות</Text>
-        ) : (
-          <View style={styles.samplesContainer}>
-            {summary.samples.map((sample, index) => (
-              <View key={index} style={styles.sampleCard}>
-                <View style={styles.sampleHeader}>
-                  <Text style={styles.sampleIndex}>#{index + 1}</Text>
-                  <Text style={styles.sampleTime}>{formatTime(sample.timestamp)}</Text>
-                </View>
-                <View style={styles.sampleRow}>
-                  <Text style={styles.sampleLabel}>מיקום:</Text>
-                  <Text style={styles.sampleValue}>{formatLocation(sample.lat, sample.lon)}</Text>
-                </View>
-                <View style={styles.sampleRow}>
-                  <Text style={styles.sampleLabel}>גובה:</Text>
-                  <Text style={styles.sampleValue}>{sample.altitude.toFixed(1)} מ'</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
+        <SamplesList samples={summary.samples} />
       </View>
 
       <View style={styles.actions}>
@@ -147,50 +113,4 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginBottom: spacing.md,
   },
-  noSamples: {
-    color: colors.muted,
-    textAlign: 'center',
-    padding: spacing.lg,
-    fontStyle: 'italic',
-  },
-  samplesContainer: {
-    gap: spacing.sm,
-    direction: 'rtl',
-  },
-  sampleCard: {
-    backgroundColor: '#0f172a',
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.xs,
-  },
-  sampleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  sampleIndex: {
-    color: colors.primary,
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  sampleTime: {
-    color: colors.muted,
-    fontSize: 12,
-  },
-  sampleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  sampleLabel: {
-    color: colors.muted,
-    fontWeight: '600',
-  },
-  sampleValue: {
-    color: colors.text,
-    fontWeight: '700',
-  },
 });
-
