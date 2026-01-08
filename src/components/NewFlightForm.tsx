@@ -259,7 +259,7 @@ export const NewFlightForm = ({ onSubmit, onCancel }: Props) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: spacing.xl,
+    padding: spacing.xs,
     gap: spacing.md,
   },
   scrollContent: {

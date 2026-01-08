@@ -82,7 +82,7 @@ export const MissionSummaryCard = ({ summary, onRestart }: Props) => (
 
 const styles = StyleSheet.create({
   scrollContent: {
-    padding: spacing.xl,
+    padding: spacing.xs,
     paddingBottom: spacing.xl * 1.5,
   },
   card: {
@@ -155,6 +155,7 @@ const styles = StyleSheet.create({
   },
   samplesContainer: {
     gap: spacing.sm,
+    direction: 'rtl',
   },
   sampleCard: {
     backgroundColor: '#0f172a',

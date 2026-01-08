@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: spacing.xl,
-    gap: spacing.md,
+    padding: spacing.xs,
+    gap: spacing.xs,
   },
 });

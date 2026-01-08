@@ -27,7 +27,7 @@ export const HomeScreen = ({ onStart }: Props) => {
         </View>
         <Text style={styles.title} numberOfLines={1}>מערכת המראה / נחיתה</Text>
         <Text style={styles.subtitle}>הפעלת רחפן מבוקרת עם הזרמה חיה</Text>
-        <PrimaryButton label="העלת רחפן חדש" onPress={onStart} style={styles.button} />
+        <PrimaryButton label="העלאת רחפן חדש" onPress={onStart} style={styles.button} />
       </Animated.View>
     </View>
   );
