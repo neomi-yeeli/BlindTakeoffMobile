@@ -302,7 +302,7 @@ export const StreamingScreen = ({
       />
 
       <View style={styles.footer}>
-        <View>
+        <View style={styles.statusBlock}>
           <Text style={styles.statusLabel}>חיבור: {connectionLabel}</Text>
           {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
           {alarmActive ? (
@@ -384,6 +384,10 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  statusBlock: {
+    alignSelf: 'stretch',
+    alignItems: 'flex-end',
   },
   statusLabel: {
     color: colors.muted,
