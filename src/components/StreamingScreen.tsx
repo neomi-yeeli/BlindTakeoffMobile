@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, AppState, AppStateStatus, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
@@ -20,6 +20,36 @@ type Props = {
 
 const FRAME_INTERVAL_MS = UI.frameIntervalMs ?? 1400;
 
+type CameraCardProps = {
+  permissionGranted: boolean;
+  onRequestPermission: () => void;
+  cameraRef: { current: CameraView | null };
+  onCameraReady: () => void;
+};
+
+const CameraCard = memo(({ permissionGranted, onRequestPermission, cameraRef, onCameraReady }: CameraCardProps) => {
+  return (
+    <View style={styles.cameraCard}>
+      {!permissionGranted ? (
+        <View style={styles.permissionBlock}>
+          <Text style={styles.permissionText}>נדרש אישור מצלמה כדי להמשיך.</Text>
+          <PrimaryButton label="אפשר גישה למצלמה" onPress={onRequestPermission} />
+        </View>
+      ) : (
+        <CameraView
+          ref={cameraRef}
+          facing="back"
+          onCameraReady={onCameraReady}
+          style={styles.camera}
+          enableTorch={false}
+          mute={false}
+          animateShutter={false}
+        />
+      )}
+    </View>
+  );
+});
+
 export const StreamingScreen = ({
   request,
   streamUrl,
@@ -38,7 +68,9 @@ export const StreamingScreen = ({
   const cameraRef = useRef<CameraView | null>(null);
   const streamingClientRef = useRef<StreamingClient | null>(null);
   const frameLoopRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const captureAndSendRef = useRef<(() => Promise<void>) | null>(null);
   const sendingRef = useRef(false);
+  const autoStartBlockedRef = useRef(false);
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const livePulse = useRef(new Animated.Value(0)).current;
   const alarmSoundRef = useRef<Audio.Sound | null>(null);
@@ -58,6 +90,10 @@ export const StreamingScreen = ({
       ])
     ).start();
   }, [livePulse]);
+
+  const onCameraReady = useCallback(() => {
+    setCameraReady(true);
+  }, []);
 
   const stopAlarm = useCallback(async () => {
     setAlarmActive(false);
@@ -101,11 +137,6 @@ export const StreamingScreen = ({
     const result = await requestPermission();
     return result.granted;
   }, [permission?.granted, requestPermission]);
-
-  const startFrameLoop = useCallback(() => {
-    if (frameLoopRef.current) return;
-    frameLoopRef.current = setInterval(captureAndSend, FRAME_INTERVAL_MS);
-  }, []);
 
   const stopFrameLoop = useCallback(() => {
     if (frameLoopRef.current) {
@@ -152,8 +183,10 @@ export const StreamingScreen = ({
     try {
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
-        quality: 0.3,
+        // Lower quality helps sustain higher FPS over WebSocket
+        quality: 0.2,
         skipProcessing: true,
+        shutterSound: false,
       });
       if (photo?.base64) {
         streamingClientRef.current?.sendFrame({
@@ -166,13 +199,24 @@ export const StreamingScreen = ({
         });
       }
     } catch (error) {
-      setErrorMessage('Frame capture failed. Check camera placement.');
+      // Avoid re-rendering on every frame if capture keeps failing.
+      setErrorMessage((prev) => prev ?? 'Frame capture failed. Check camera placement.');
       // eslint-disable-next-line no-console
       console.warn('capture failed', error);
     } finally {
       sendingRef.current = false;
     }
   }, [cameraReady, connectionStatus, request.operationType]);
+
+  // Keep the interval always calling the latest capture function (avoid stale closure).
+  captureAndSendRef.current = captureAndSend;
+
+  const startFrameLoop = useCallback(() => {
+    if (frameLoopRef.current) return;
+    frameLoopRef.current = setInterval(() => {
+      void captureAndSendRef.current?.();
+    }, FRAME_INTERVAL_MS);
+  }, []);
 
   const beginStreaming = useCallback(async () => {
     const hasPermission = await ensurePermission();
@@ -195,13 +239,15 @@ export const StreamingScreen = ({
   }, [ensurePermission, onStreamingStart, startFrameLoop]);
 
   useEffect(() => {
-    if (autoStart && permission?.granted && cameraReady && !isStreaming) {
+    if (autoStartBlockedRef.current) return;
+    if (autoStart && permission?.granted && cameraReady && !isStreaming && !isFinishing) {
       beginStreaming();
     }
-  }, [autoStart, beginStreaming, cameraReady, isStreaming, permission?.granted]);
+  }, [autoStart, beginStreaming, cameraReady, isFinishing, isStreaming, permission?.granted]);
 
   const finish = useCallback(async () => {
     const endedAt = Date.now();
+    autoStartBlockedRef.current = true;
     setIsFinishing(true);
     stopStreaming();
     try {
@@ -248,37 +294,23 @@ export const StreamingScreen = ({
         </View>
       </View>
 
-      <View style={styles.cameraCard}>
-        {!permissionGranted ? (
-          <View style={styles.permissionBlock}>
-            <Text style={styles.permissionText}>נדרש אישור מצלמה כדי להמשיך.</Text>
-            <PrimaryButton label="אפשר גישה למצלמה" onPress={beginStreaming} />
-          </View>
-        ) : (
-          <CameraView
-            ref={(ref) => {
-              cameraRef.current = ref;
-            }}
-            facing="back"
-            onCameraReady={() => setCameraReady(true)}
-            style={styles.camera}
-            enableTorch={false}
-            mute={false}
-          />
-        )}
-      </View>
+      <CameraCard
+        permissionGranted={permissionGranted}
+        onRequestPermission={beginStreaming}
+        cameraRef={cameraRef}
+        onCameraReady={onCameraReady}
+      />
 
       <View style={styles.footer}>
         <View>
-          <Text style={styles.statusLabel}>חיבור</Text>
-          <Text style={styles.statusValue}>{connectionLabel}</Text>
+          <Text style={styles.statusLabel}>חיבור: {connectionLabel}</Text>
           {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
           {alarmActive ? (
             <SecondaryButton label="כבה אזעקה" onPress={stopAlarm} style={styles.alarmButton} />
           ) : null}
         </View>
         <View style={styles.actions}>
-          <PrimaryButton label="סיום הפעולה" onPress={finish} />
+          <PrimaryButton label="סיום הפעולה" onPress={finish} disabled={isFinishing} />
         </View>
       </View>
     </View>
@@ -365,6 +397,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
     writingDirection: 'rtl',
     textAlign: 'right',
+  },
+  statusUrl: {
+    color: colors.muted,
+    marginTop: 4,
+    maxWidth: 280,
   },
   error: {
     color: colors.danger,

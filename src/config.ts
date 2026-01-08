@@ -4,7 +4,8 @@ export const STREAM_SERVER_URL =
 export const AUTO_APPROVE_MS = 2200;
 
 export const UI = {
-  frameIntervalMs: 1400,
+  // 5 frames/sec (video-like feel)
+  frameIntervalMs: 200,
 };
 
 export const ALARM_SOUND_URI =

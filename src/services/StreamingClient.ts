@@ -34,7 +34,9 @@ export class StreamingClient {
 
         this.socket.onerror = (event) => {
           this.setStatus('error');
-          reject(new Error(`Streaming socket error: ${JSON.stringify(event)}`));
+          const maybeMessage = (event as unknown as { message?: unknown })?.message;
+          const details = typeof maybeMessage === 'string' ? maybeMessage : JSON.stringify(event);
+          reject(new Error(`Streaming socket error: ${details}`));
         };
 
         this.socket.onclose = () => {
