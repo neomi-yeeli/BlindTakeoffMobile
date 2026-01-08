@@ -1,12 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing } from '../theme';
+import { formatCountdown } from '../utils/format';
 
 type Props = {
   status: 'pending' | 'approved';
+  countdownMs?: number;
 };
 
-export const ApprovalStatus = ({ status }: Props) => {
+export const ApprovalStatus = ({ status, countdownMs }: Props) => {
   const progress = useRef(new Animated.Value(status === 'approved' ? 1 : 0)).current;
 
   useEffect(() => {
@@ -25,21 +27,25 @@ export const ApprovalStatus = ({ status }: Props) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Flight Request</Text>
+      <Text style={styles.title}>בקשה נשלחה</Text>
       <Text style={styles.subtitle}>
-        {status === 'pending' ? 'Awaiting approval...' : 'Approved. Preparing camera.'}
+        {status === 'pending' ? 'ממתין לאישור...' : 'אושר. מכין את המצלמה.'}
       </Text>
 
       <View style={styles.bar}>
         <Animated.View style={[styles.barFill, { width: widthInterpolation }]} />
       </View>
 
+      {typeof countdownMs === 'number' ? (
+        <Text style={styles.countdown}>טיימר עד תחילת פעולה: {formatCountdown(countdownMs)}</Text>
+      ) : null}
+
       <View style={styles.badgeRow}>
         <View style={[styles.badge, status === 'pending' ? styles.badgeActive : styles.badgeDim]}>
-          <Text style={styles.badgeText}>Pending</Text>
+          <Text style={styles.badgeText}>ממתין</Text>
         </View>
         <View style={[styles.badge, status === 'approved' ? styles.badgeActive : styles.badgeDim]}>
-          <Text style={styles.badgeText}>Approved</Text>
+          <Text style={styles.badgeText}>אושר</Text>
         </View>
       </View>
     </View>
@@ -48,20 +54,27 @@ export const ApprovalStatus = ({ status }: Props) => {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: colors.card,
     padding: spacing.xl,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   title: {
     color: colors.text,
     fontSize: 22,
     fontWeight: '800',
+    writingDirection: 'rtl',
+    textAlign: 'center',
   },
   subtitle: {
     color: colors.muted,
+    writingDirection: 'rtl',
+    textAlign: 'center',
   },
   bar: {
     height: 10,
@@ -93,6 +106,13 @@ const styles = StyleSheet.create({
   badgeText: {
     color: colors.text,
     fontWeight: '700',
+  },
+  countdown: {
+    marginTop: spacing.sm,
+    color: colors.text,
+    fontWeight: '700',
+    writingDirection: 'rtl',
+    textAlign: 'center',
   },
 });
 
