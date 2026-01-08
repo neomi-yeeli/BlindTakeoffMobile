@@ -70,6 +70,7 @@ export const StreamingScreen = ({
   const frameLoopRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const captureAndSendRef = useRef<(() => Promise<void>) | null>(null);
   const sendingRef = useRef(false);
+  const autoStartBlockedRef = useRef(false);
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const livePulse = useRef(new Animated.Value(0)).current;
   const alarmSoundRef = useRef<Audio.Sound | null>(null);
@@ -238,13 +239,15 @@ export const StreamingScreen = ({
   }, [ensurePermission, onStreamingStart, startFrameLoop]);
 
   useEffect(() => {
-    if (autoStart && permission?.granted && cameraReady && !isStreaming) {
+    if (autoStartBlockedRef.current) return;
+    if (autoStart && permission?.granted && cameraReady && !isStreaming && !isFinishing) {
       beginStreaming();
     }
-  }, [autoStart, beginStreaming, cameraReady, isStreaming, permission?.granted]);
+  }, [autoStart, beginStreaming, cameraReady, isFinishing, isStreaming, permission?.granted]);
 
   const finish = useCallback(async () => {
     const endedAt = Date.now();
+    autoStartBlockedRef.current = true;
     setIsFinishing(true);
     stopStreaming();
     try {
@@ -307,7 +310,7 @@ export const StreamingScreen = ({
           ) : null}
         </View>
         <View style={styles.actions}>
-          <PrimaryButton label="סיום הפעולה" onPress={finish} />
+          <PrimaryButton label="סיום הפעולה" onPress={finish} disabled={isFinishing} />
         </View>
       </View>
     </View>
