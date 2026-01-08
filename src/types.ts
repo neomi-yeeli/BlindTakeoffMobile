@@ -1,6 +1,6 @@
 export type OperationType = 'takeoff' | 'landing';
 
-export type OperationPhase = 'form' | 'pending' | 'approved' | 'streaming' | 'summary';
+export type OperationPhase = 'home' | 'form' | 'pending' | 'countdown' | 'streaming' | 'summary';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'closed';
 
@@ -10,6 +10,7 @@ export interface FlightRequest {
   widthCm: number;
   lengthCm: number;
   operationType: OperationType;
+  timerMs: number;
   locationLabel?: string;
   createdAt: number;
 }

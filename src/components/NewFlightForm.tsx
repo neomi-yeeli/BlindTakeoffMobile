@@ -1,5 +1,17 @@
-import { useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Alert,
+  Animated,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
 import * as Location from 'expo-location';
 import { colors, radius, spacing } from '../theme';
 import { FlightRequest, OperationType } from '../types';
@@ -7,19 +19,24 @@ import { PrimaryButton, SecondaryButton, PillToggle } from './Buttons';
 
 type Props = {
   onSubmit: (request: FlightRequest) => void;
+  onCancel?: () => void;
 };
 
-type ValidationErrors = Partial<Record<'lat' | 'lon' | 'width' | 'length', string>>;
+type ValidationErrors = Partial<Record<'lat' | 'lon' | 'width' | 'length' | 'timer', string>>;
 
-export const NewFlightForm = ({ onSubmit }: Props) => {
+export const NewFlightForm = ({ onSubmit, onCancel }: Props) => {
   const [lat, setLat] = useState('');
   const [lon, setLon] = useState('');
   const [width, setWidth] = useState('');
   const [length, setLength] = useState('');
+  const [minutes, setMinutes] = useState('00');
+  const [seconds, setSeconds] = useState('30');
   const [operationType, setOperationType] = useState<OperationType>('takeoff');
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [busy, setBusy] = useState(false);
   const [locationLabel, setLocationLabel] = useState<string | undefined>();
+  const fade = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(20)).current;
 
   const validation = useMemo(() => {
     const newErrors: ValidationErrors = {};
@@ -27,25 +44,31 @@ export const NewFlightForm = ({ onSubmit }: Props) => {
     const parsedLon = parseFloat(lon);
     const parsedWidth = parseFloat(width);
     const parsedLength = parseFloat(length);
+    const parsedMinutes = parseInt(minutes, 10);
+    const parsedSeconds = parseInt(seconds, 10);
+    const totalMs = (Number.isFinite(parsedMinutes) ? parsedMinutes : 0) * 60_000 + (Number.isFinite(parsedSeconds) ? parsedSeconds : 0) * 1000;
 
     if (!Number.isFinite(parsedLat) || parsedLat < -90 || parsedLat > 90) {
-      newErrors.lat = 'Latitude must be between -90 and 90';
+      newErrors.lat = 'יש להזין קו רוחב תקין';
     }
     if (!Number.isFinite(parsedLon) || parsedLon < -180 || parsedLon > 180) {
-      newErrors.lon = 'Longitude must be between -180 and 180';
+      newErrors.lon = 'יש להזין קו אורך תקין';
     }
     if (!Number.isFinite(parsedWidth) || parsedWidth <= 0) {
-      newErrors.width = 'Width must be a positive number';
+      newErrors.width = 'יש להזין רוחב חיובי';
     }
     if (!Number.isFinite(parsedLength) || parsedLength <= 0) {
-      newErrors.length = 'Length must be a positive number';
+      newErrors.length = 'יש להזין אורך חיובי';
+    }
+    if (!Number.isFinite(parsedMinutes) || !Number.isFinite(parsedSeconds) || totalMs <= 0) {
+      newErrors.timer = 'יש להזין זמן תקין';
     }
 
-    return { newErrors, parsedLat, parsedLon, parsedWidth, parsedLength };
-  }, [lat, length, lon, width]);
+    return { newErrors, parsedLat, parsedLon, parsedWidth, parsedLength, totalMs };
+  }, [lat, length, lon, minutes, seconds, width]);
 
   const handleSubmit = () => {
-    const { newErrors, parsedLat, parsedLon, parsedWidth, parsedLength } = validation;
+    const { newErrors, parsedLat, parsedLon, parsedWidth, parsedLength, totalMs } = validation;
     setErrors(newErrors);
     if (Object.keys(newErrors).length) return;
 
@@ -57,6 +80,7 @@ export const NewFlightForm = ({ onSubmit }: Props) => {
       operationType,
       locationLabel,
       createdAt: Date.now(),
+      timerMs: totalMs,
     });
   };
 
@@ -79,20 +103,36 @@ export const NewFlightForm = ({ onSubmit }: Props) => {
     }
   };
 
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fade, { toValue: 1, duration: 450, useNativeDriver: true }),
+      Animated.spring(slide, { toValue: 0, useNativeDriver: true }),
+    ]).start();
+  }, [fade, slide]);
+
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>New Flight</Text>
-        <Text style={styles.subtitle}>Submit a takeoff / landing request</Text>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Animated.View style={[styles.card, { opacity: fade, transform: [{ translateY: slide }] }]}>
+        <Text style={styles.title}>בקשת המראה / נחיתה</Text>
+        <Text style={styles.subtitle}>מלא את הפרטים ונתחיל בהזרמה החיה</Text>
 
         <View style={styles.row}>
           <View style={styles.field}>
-            <Text style={styles.label}>Latitude</Text>
+            <Text style={styles.label}>מיקום - קו רוחב (Latitude)</Text>
             <TextInput
-              placeholder="e.g. 37.7749"
+              placeholder="לדוגמה 32.08"
               placeholderTextColor={colors.muted}
               value={lat}
-              onChangeText={setLat}
+              onChangeText={(v) => {
+                setLat(v);
+                if (errors.lat) setErrors((prev) => ({ ...prev, lat: undefined }));
+              }}
               keyboardType="decimal-pad"
               style={[styles.input, errors.lat && styles.inputError]}
             />
@@ -100,12 +140,15 @@ export const NewFlightForm = ({ onSubmit }: Props) => {
           </View>
           <View style={styles.spacer} />
           <View style={styles.field}>
-            <Text style={styles.label}>Longitude</Text>
+            <Text style={styles.label}>מיקום - קו אורך (Longitude)</Text>
             <TextInput
-              placeholder="-122.4194"
+              placeholder="לדוגמה 34.80"
               placeholderTextColor={colors.muted}
               value={lon}
-              onChangeText={setLon}
+              onChangeText={(v) => {
+                setLon(v);
+                if (errors.lon) setErrors((prev) => ({ ...prev, lon: undefined }));
+              }}
               keyboardType="decimal-pad"
               style={[styles.input, errors.lon && styles.inputError]}
             />
@@ -113,16 +156,19 @@ export const NewFlightForm = ({ onSubmit }: Props) => {
           </View>
         </View>
 
-        <SecondaryButton label="Use current GPS" onPress={fillCurrentLocation} disabled={busy} style={styles.fullButton} />
+        <SecondaryButton label="שימוש במיקום נוכחי" onPress={fillCurrentLocation} disabled={busy} style={styles.fullButton} />
 
         <View style={styles.row}>
           <View style={styles.field}>
-            <Text style={styles.label}>Drone width (cm)</Text>
+            <Text style={styles.label}>רוחב רחפן (ס"מ)</Text>
             <TextInput
-              placeholder="Width"
+              placeholder="לדוגמה 45"
               placeholderTextColor={colors.muted}
               value={width}
-              onChangeText={setWidth}
+              onChangeText={(v) => {
+                setWidth(v);
+                if (errors.width) setErrors((prev) => ({ ...prev, width: undefined }));
+              }}
               keyboardType="numeric"
               style={[styles.input, errors.width && styles.inputError]}
             />
@@ -130,12 +176,15 @@ export const NewFlightForm = ({ onSubmit }: Props) => {
           </View>
           <View style={styles.spacer} />
           <View style={styles.field}>
-            <Text style={styles.label}>Drone length (cm)</Text>
+            <Text style={styles.label}>אורך רחפן (ס"מ)</Text>
             <TextInput
-              placeholder="Length"
+              placeholder="לדוגמה 40"
               placeholderTextColor={colors.muted}
               value={length}
-              onChangeText={setLength}
+              onChangeText={(v) => {
+                setLength(v);
+                if (errors.length) setErrors((prev) => ({ ...prev, length: undefined }));
+              }}
               keyboardType="numeric"
               style={[styles.input, errors.length && styles.inputError]}
             />
@@ -143,19 +192,67 @@ export const NewFlightForm = ({ onSubmit }: Props) => {
           </View>
         </View>
 
-        <Text style={styles.label}>Operation type</Text>
+        <Text style={styles.label}>סוג פעולה</Text>
         <PillToggle
           value={operationType}
           onChange={setOperationType}
           options={[
-            { label: 'Takeoff', value: 'takeoff' },
-            { label: 'Landing', value: 'landing' },
+            { label: 'המראה', value: 'takeoff' },
+            { label: 'נחיתה', value: 'landing' },
           ]}
         />
 
-        <PrimaryButton label="Submit request" onPress={handleSubmit} disabled={busy} style={styles.submit} />
-      </View>
-    </KeyboardAvoidingView>
+        <Text style={styles.label}>טיימר עד תחילת פעולה</Text>
+        <View style={styles.row}>
+          <View style={styles.field}>
+            <Text style={styles.subLabel}>דקות</Text>
+            <TextInput
+              placeholder="00"
+              placeholderTextColor={colors.muted}
+              value={minutes}
+              onChangeText={(v) => {
+                const val = v.replace(/[^0-9]/g, '');
+                setMinutes(val);
+                if (errors.timer) setErrors((prev) => ({ ...prev, timer: undefined }));
+              }}
+              keyboardType="number-pad"
+              style={[styles.input, errors.timer && styles.inputError]}
+            />
+          </View>
+          <View style={styles.spacer} />
+          <View style={styles.field}>
+            <Text style={styles.subLabel}>שניות</Text>
+            <TextInput
+              placeholder="30"
+              placeholderTextColor={colors.muted}
+              value={seconds}
+              onChangeText={(v) => {
+                const val = v.replace(/[^0-9]/g, '');
+                setSeconds(val);
+                if (errors.timer) setErrors((prev) => ({ ...prev, timer: undefined }));
+              }}
+              keyboardType="number-pad"
+              style={[styles.input, errors.timer && styles.inputError]}
+            />
+          </View>
+        </View>
+        {errors.timer ? <Text style={styles.error}>{errors.timer}</Text> : null}
+
+          <View style={styles.actionsRow}>
+            <PrimaryButton label="שליחת בקשה" onPress={handleSubmit} disabled={busy} style={styles.submitBtn} />
+            {onCancel ? (
+              <SecondaryButton
+                label="ביטול בקשה חדשה"
+                onPress={onCancel}
+                disabled={busy}
+                style={styles.cancelBtn}
+              />
+            ) : null}
+          </View>
+        </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 };
 
@@ -164,6 +261,9 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: spacing.xl,
     gap: spacing.md,
+  },
+  scrollContent: {
+    paddingBottom: spacing.lg,
   },
   card: {
     backgroundColor: colors.card,
@@ -177,18 +277,36 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '800',
     color: colors.text,
+    writingDirection: 'rtl',
+    textAlign: 'right',
   },
   subtitle: {
     color: colors.muted,
     marginBottom: spacing.sm,
+    writingDirection: 'rtl',
+    textAlign: 'right',
+  },
+  helper: {
+    color: colors.muted,
+    writingDirection: 'rtl',
+    textAlign: 'right',
   },
   label: {
     color: colors.muted,
     fontWeight: '600',
     marginBottom: 6,
+    writingDirection: 'rtl',
+    textAlign: 'right',
+  },
+  subLabel: {
+    color: colors.muted,
+    fontWeight: '600',
+    marginBottom: 6,
+    writingDirection: 'rtl',
+    textAlign: 'right',
   },
   row: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'flex-start',
     gap: spacing.sm,
   },
@@ -204,6 +322,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     color: colors.text,
     fontSize: 16,
+    textAlign: 'right',
+    writingDirection: 'rtl',
   },
   inputError: {
     borderColor: colors.danger,
@@ -211,15 +331,34 @@ const styles = StyleSheet.create({
   error: {
     color: colors.danger,
     marginTop: spacing.xs,
+    fontSize: 12,
+    textAlign: 'right',
+    writingDirection: 'rtl',
   },
   spacer: {
     width: spacing.md,
   },
-  submit: {
-    marginTop: spacing.md,
+  submitBtn: {
+    marginTop: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  cancelBtn: {
+    marginTop: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   fullButton: {
     marginBottom: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  actionsRow: {
+    flexDirection: 'row-reverse',
+    gap: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    flexWrap: 'wrap',
   },
 });
 

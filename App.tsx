@@ -8,19 +8,45 @@ import { StreamingScreen } from './src/components/StreamingScreen';
 import { MissionSummaryCard } from './src/components/MissionSummary';
 import { useOperationFlow } from './src/hooks/useOperationFlow';
 import { STREAM_SERVER_URL, AUTO_APPROVE_MS } from './src/config';
+import { HomeScreen } from './src/components/HomeScreen';
+import { TimerScreen } from './src/components/TimerScreen';
+import { LogoOverlay } from './src/components/LogoOverlay';
 
 export default function App() {
-  const { phase, request, summary, approvalState, submitRequest, markStreamingStart, finishOperation, reset } =
-    useOperationFlow(AUTO_APPROVE_MS);
+  const {
+    phase,
+    request,
+    summary,
+    approvalState,
+    countdownMs,
+    submitRequest,
+    markStreamingStart,
+    finishOperation,
+    startNew,
+    reset,
+    updateTimer,
+    launchNow,
+  } = useOperationFlow(AUTO_APPROVE_MS);
 
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar style="light" />
+      <LogoOverlay />
       <View style={styles.container}>
-        {phase === 'form' && <NewFlightForm onSubmit={submitRequest} />}
+        {phase === 'home' && <HomeScreen onStart={startNew} />}
+        {phase === 'form' && <NewFlightForm onSubmit={submitRequest} onCancel={reset} />}
         {phase === 'pending' && <ApprovalStatus status={approvalState} />}
 
-        {(phase === 'approved' || phase === 'streaming') && request ? (
+        {phase === 'countdown' && request ? (
+          <TimerScreen
+            remainingMs={countdownMs}
+            totalMs={request.timerMs}
+            onEditTimer={updateTimer}
+            onLaunchNow={launchNow}
+          />
+        ) : null}
+
+        {phase === 'streaming' && request ? (
           <StreamingScreen
             request={request}
             streamUrl={STREAM_SERVER_URL}

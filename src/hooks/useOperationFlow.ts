@@ -24,11 +24,13 @@ const fetchSamplesFromServer = async (): Promise<LocationSample[]> => {
 };
 
 export const useOperationFlow = (autoApproveMs: number = DEFAULT_APPROVAL_MS) => {
-  const [phase, setPhase] = useState<OperationPhase>('form');
+  const [phase, setPhase] = useState<OperationPhase>('home');
   const [request, setRequest] = useState<FlightRequest | null>(null);
   const [summary, setSummary] = useState<MissionSummary | null>(null);
   const [approvalState, setApprovalState] = useState<'pending' | 'approved'>('pending');
   const streamingStartRef = useRef<number | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [countdownMs, setCountdownMs] = useState<number>(0);
 
   useEffect(() => {
     if (phase !== 'pending') return undefined;
@@ -36,15 +38,51 @@ export const useOperationFlow = (autoApproveMs: number = DEFAULT_APPROVAL_MS) =>
 
     const timer = setTimeout(async () => {
       setApprovalState('approved');
-      setPhase('approved');
+      setPhase('countdown');
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }, autoApproveMs);
 
     return () => clearTimeout(timer);
   }, [autoApproveMs, phase]);
 
+  useEffect(() => {
+    if (phase !== 'countdown') {
+      stopCountdown();
+      return;
+    }
+    if (!request) return;
+    if (countdownMs <= 0) {
+      setPhase('streaming');
+      return;
+    }
+    startCountdown();
+    return () => stopCountdown();
+  }, [countdownMs, phase, request]);
+
+  const startCountdown = () => {
+    stopCountdown();
+    countdownRef.current = setInterval(() => {
+      setCountdownMs((prev) => {
+        const next = Math.max(0, prev - 1000);
+        if (next <= 0) {
+          stopCountdown();
+          setPhase('streaming');
+        }
+        return next;
+      });
+    }, 1000);
+  };
+
+  const stopCountdown = () => {
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+  };
+
   const submitRequest = (data: FlightRequest) => {
     setRequest(data);
+    setCountdownMs(data.timerMs);
     setSummary(null);
     setPhase('pending');
     streamingStartRef.current = null;
@@ -83,11 +121,43 @@ export const useOperationFlow = (autoApproveMs: number = DEFAULT_APPROVAL_MS) =>
   };
 
   const reset = () => {
-    setPhase('form');
+    setPhase('home');
     setSummary(null);
     setRequest(null);
     setApprovalState('pending');
     streamingStartRef.current = null;
+    stopCountdown();
+    setCountdownMs(0);
+  };
+
+  const startNew = () => {
+    setPhase('form');
+    setSummary(null);
+    setRequest(null);
+    setApprovalState('pending');
+    stopCountdown();
+    setCountdownMs(0);
+    streamingStartRef.current = null;
+  };
+
+  const updateTimer = (ms: number) => {
+    setCountdownMs(ms);
+    if (request) {
+      setRequest({ ...request, timerMs: ms });
+    }
+    if (phase === 'countdown') {
+      if (ms <= 0) {
+        setPhase('streaming');
+      } else {
+        startCountdown();
+      }
+    }
+  };
+
+  const launchNow = () => {
+    setCountdownMs(0);
+    stopCountdown();
+    setPhase('streaming');
   };
 
   return {
@@ -95,9 +165,13 @@ export const useOperationFlow = (autoApproveMs: number = DEFAULT_APPROVAL_MS) =>
     request,
     summary,
     approvalState,
+    countdownMs,
     submitRequest,
     markStreamingStart,
     finishOperation,
+    startNew,
+    updateTimer,
+    launchNow,
     reset,
   };
 };

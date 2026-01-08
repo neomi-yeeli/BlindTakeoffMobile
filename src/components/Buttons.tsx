@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, spacing, shadow } from '../theme';
 
 type ButtonProps = {
   label: string;
@@ -71,58 +71,70 @@ const styles = StyleSheet.create({
   base: {
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   primary: {
     backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    ...shadow.card,
   },
   secondary: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
+    borderColor: colors.accent,
+    backgroundColor: '#0f172a',
+    ...shadow.card,
   },
   primaryText: {
     color: '#04101a',
-    fontWeight: '700',
-    fontSize: 16,
+    fontWeight: '800',
+    fontSize: 14,
   },
   secondaryText: {
     color: colors.text,
-    fontWeight: '700',
-    fontSize: 16,
+    fontWeight: '800',
+    fontSize: 14,
   },
   pressed: {
-    opacity: 0.86,
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
   },
   disabled: {
     opacity: 0.5,
   },
   toggleRow: {
     flexDirection: 'row',
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    padding: 4,
-    gap: 6,
+    backgroundColor: '#0f172a',
+    borderRadius: radius.lg,
+    padding: 6,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.accent,
   },
   toggleItem: {
     flex: 1,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
     alignItems: 'center',
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: 'transparent',
+    ...shadow.card,
   },
   toggleItemActive: {
-    backgroundColor: colors.primaryAlt,
-    borderColor: colors.primaryAlt,
+    backgroundColor: colors.primary,
+    borderColor: colors.accent,
   },
   toggleLabel: {
     color: colors.muted,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
   toggleLabelActive: {
     color: '#04101a',
+    fontWeight: '800',
   },
 });
 

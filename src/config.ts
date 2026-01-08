@@ -7,3 +7,7 @@ export const UI = {
   frameIntervalMs: 1400,
 };
 
+export const ALARM_SOUND_URI =
+  process.env.EXPO_PUBLIC_ALARM_SOUND_URI ??
+  'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg';
+
